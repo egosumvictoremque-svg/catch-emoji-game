@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Catch the Emoji - Final Arcade Edition</title>
+<title>Catch the Emoji - Smooth Arcade Edition</title>
 <style>
 html, body {
     margin: 0;
@@ -28,19 +28,13 @@ html, body {
     position: absolute;
     font-size: 40px;
     cursor: pointer;
-    animation: fall linear forwards;
     z-index: 3;
-}
-@keyframes fall {
-    0% { top: -50px; }
-    100% { top: 100vh; }
+    user-select: none;
 }
 .pop {
-    animation: pop 0.3s ease-out forwards;
-}
-@keyframes pop {
-    0% { transform: scale(1); opacity: 1; }
-    100% { transform: scale(2); opacity: 0; }
+    transform: scale(1.5);
+    opacity: 0;
+    transition: transform 0.2s ease, opacity 0.2s ease;
 }
 #startScreen, #gameOver {
     position: fixed;
@@ -75,7 +69,6 @@ canvas {
 .enemy {
     position: absolute;
     font-size: 60px;
-    top: 50%;
     animation: moveEnemy 10s linear forwards;
     z-index: 4;
 }
@@ -111,8 +104,10 @@ canvas {
 <audio id="bgMusic" src="https://cdn.pixabay.com/download/audio/2023/03/07/audio_3a1b49a3a5.mp3?filename=arcade-arcade-music-loop-146875.mp3" loop></audio>
 
 <script>
-let score = 0, lives = 3, fallSpeed = 4000, spawnRate = 1000;
-let gameActive = false, gameInterval, timerInterval, timer;
+let score = 0, lives = 3;
+let fallSpeed = 2.5, spawnDelay = 1000; // lebih smooth
+let gameActive = false, lastSpawn = 0;
+const emojiList = ["🍕","🍔","🍟","🍩","🍎","🍌","🍓","🪙","💎","⭐","⚽","🎯"];
 const clickSound = document.getElementById("clickSound");
 const missSound = document.getElementById("missSound");
 const bgMusic = document.getElementById("bgMusic");
@@ -124,64 +119,50 @@ function unlockAudio() {
         clickSound.play().then(() => { clickSound.pause(); clickSound.currentTime = 0; });
         missSound.play().then(() => { missSound.pause(); missSound.currentTime = 0; });
         bgMusic.play().then(() => { bgMusic.pause(); bgMusic.currentTime = 0; });
-    } catch (err) { console.warn("Audio unlock failed:", err); }
+    } catch {}
 }
 
 function startGame() {
     unlockAudio();
-
     if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
 
     bgMusic.currentTime = 0;
-    bgMusic.play().catch(err => console.log("Music autoplay blocked:", err));
+    bgMusic.play().catch(() => {});
 
-    score = 0; lives = 3; fallSpeed = 4000; spawnRate = 1000;
+    score = 0; lives = 3;
+    fallSpeed = 2.5; spawnDelay = 1000;
     document.getElementById("score").textContent = "Score: 0";
     document.getElementById("lives").textContent = "Lives: 3 ❤️";
     document.getElementById("startScreen").style.display = "none";
     document.getElementById("gameOver").style.display = "none";
     gameActive = true;
-    gameInterval = setInterval(spawnEmoji, spawnRate);
+    lastSpawn = performance.now();
+    requestAnimationFrame(gameLoop);
 }
 
 function spawnEmoji() {
-    if (!gameActive) return;
-
-    const emojiList = ["🍕","🍔","🍟","🍩","🍎","🍌","🍓","🪙","💎","⭐","⚽"];
     const emoji = document.createElement("div");
     emoji.classList.add("emoji");
     emoji.textContent = emojiList[Math.floor(Math.random() * emojiList.length)];
-    emoji.style.left = Math.random() * (window.innerWidth - 50) + "px";
-    emoji.style.animationDuration = fallSpeed / 1000 + "s";
-
+    emoji.x = Math.random() * (window.innerWidth - 50);
+    emoji.y = -50;
+    emoji.style.left = emoji.x + "px";
+    emoji.style.top = emoji.y + "px";
     document.body.appendChild(emoji);
 
-    let clicked = false;
     emoji.addEventListener("click", () => {
-        if (clicked) return;
-        clicked = true;
+        if (!gameActive || emoji.clicked) return;
+        emoji.clicked = true;
         score++;
         clickSound.currentTime = 0; clickSound.play();
         document.getElementById("score").textContent = "Score: " + score;
         emoji.classList.add("pop");
-        setTimeout(() => emoji.remove(), 300);
+        setTimeout(() => emoji.remove(), 200);
 
         if (score % 100 === 0) spawnEnemy();
-        if (spawnRate > 300) spawnRate -= 20;
-        if (fallSpeed > 1000) fallSpeed -= 50;
-        clearInterval(gameInterval);
-        gameInterval = setInterval(spawnEmoji, spawnRate);
+        if (spawnDelay > 300) spawnDelay -= 20;
+        if (fallSpeed < 7) fallSpeed += 0.1;
     });
-
-    setTimeout(() => {
-        if (!clicked && gameActive) {
-            lives--;
-            missSound.currentTime = 0; missSound.play();
-            document.getElementById("lives").textContent = "Lives: " + lives + " ❤️";
-            if (lives <= 0) gameOver();
-        }
-        emoji.remove();
-    }, fallSpeed);
 }
 
 function spawnEnemy() {
@@ -193,9 +174,34 @@ function spawnEnemy() {
     setTimeout(() => enemy.remove(), 10000);
 }
 
+function gameLoop(timestamp) {
+    if (!gameActive) return;
+
+    // Spawn emoji sesuai delay
+    if (timestamp - lastSpawn > spawnDelay) {
+        spawnEmoji();
+        lastSpawn = timestamp;
+    }
+
+    // Gerakkan semua emoji
+    document.querySelectorAll(".emoji").forEach(emoji => {
+        if (emoji.clicked) return;
+        emoji.y += fallSpeed;
+        emoji.style.top = emoji.y + "px";
+        if (emoji.y > window.innerHeight) {
+            emoji.remove();
+            lives--;
+            missSound.currentTime = 0; missSound.play();
+            document.getElementById("lives").textContent = "Lives: " + lives + " ❤️";
+            if (lives <= 0) gameOver();
+        }
+    });
+
+    requestAnimationFrame(gameLoop);
+}
+
 function gameOver() {
     gameActive = false;
-    clearInterval(gameInterval);
     bgMusic.pause();
     document.getElementById("finalScore").textContent = "Your Score: " + score;
     document.getElementById("gameOver").style.display = "block";
