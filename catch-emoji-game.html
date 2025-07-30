@@ -3,92 +3,226 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Catch the Emoji - Aurora Edition</title>
+<title>Catch the Emoji - Final Arcade Edition</title>
 <style>
-    html, body {
-        margin: 0;
-        padding: 0;
-        height: 100%;
-        overflow: hidden;
-        font-family: Arial, sans-serif;
-        background: black;
-        color: white;
-        text-align: center;
-    }
-    #score, #lives {
-        font-size: 22px;
-        font-weight: bold;
-        position: absolute;
-        top: 10px;
-        z-index: 2;
-    }
-    #score { left: 10px; }
-    #lives { right: 10px; }
-    .emoji {
-        position: absolute;
-        font-size: 40px;
-        cursor: pointer;
-        animation: fall 4s linear forwards;
-        z-index: 2;
-    }
-    @keyframes fall {
-        0% { top: -50px; }
-        100% { top: 100vh; }
-    }
-    .pop {
-        animation: pop 0.3s ease-out forwards;
-    }
-    @keyframes pop {
-        0% { transform: scale(1); opacity: 1; }
-        100% { transform: scale(2); opacity: 0; }
-    }
-    #gameOver, #startScreen {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: rgba(0,0,0,0.8);
-        padding: 20px;
-        font-size: 22px;
-        border-radius: 10px;
-        display: none;
-        z-index: 3;
-    }
-    button {
-        padding: 10px 20px;
-        font-size: 18px;
-        border: none;
-        border-radius: 8px;
-        background: #ff9800;
-        color: white;
-        cursor: pointer;
-    }
-    button:hover {
-        background: #e68900;
-    }
-    canvas {
-        position: absolute;
-        top: 0;
-        left: 0;
-        z-index: 0;
-    }
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+    background: black;
+    color: white;
+    font-family: Arial, sans-serif;
+}
+#score, #lives, #timer {
+    font-size: 22px;
+    font-weight: bold;
+    position: absolute;
+    top: 10px;
+    z-index: 3;
+}
+#score { left: 10px; }
+#lives { right: 10px; }
+#timer { left: 50%; transform: translateX(-50%); }
+.emoji {
+    position: absolute;
+    font-size: 40px;
+    cursor: pointer;
+    animation: fall linear forwards;
+    z-index: 3;
+}
+@keyframes fall {
+    0% { top: -50px; }
+    100% { top: 100vh; }
+}
+.pop {
+    animation: pop 0.3s ease-out forwards;
+}
+@keyframes pop {
+    0% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(2); opacity: 0; }
+}
+#startScreen, #gameOver {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.85);
+    padding: 20px;
+    border-radius: 10px;
+    text-align: center;
+    display: none;
+    z-index: 5;
+}
+button {
+    padding: 10px 20px;
+    font-size: 18px;
+    border: none;
+    border-radius: 8px;
+    background: #ff9800;
+    color: white;
+    cursor: pointer;
+}
+button:hover {
+    background: #e68900;
+}
+canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 0;
+}
+.enemy {
+    position: absolute;
+    font-size: 60px;
+    top: 50%;
+    animation: moveEnemy 10s linear forwards;
+    z-index: 4;
+}
+@keyframes moveEnemy {
+    0% { left: -100px; }
+    100% { left: 110vw; }
+}
 </style>
 </head>
 <body>
 
-<!-- Background Aurora -->
 <canvas id="bgCanvas"></canvas>
 
 <p id="score">Score: 0</p>
 <p id="lives">Lives: 3 ❤️</p>
+<p id="timer"></p>
 
 <div id="startScreen">
-    <h2>🌌 Catch the Emoji - Aurora Edition 🌌</h2>
-    <p>Tap emojis before they fall!<br>You have 3 lives!</p>
+    <h2>🌌 Catch the Emoji - Arcade Edition 🌌</h2>
+    <p>Tap the emojis before they fall!<br>Don't miss or you'll lose lives!</p>
     <button onclick="startGame()">Start Game</button>
 </div>
 
 <div id="gameOver">
     💀 Game Over!<br>
     <p id="finalScore"></p>
-    <button onclick="restartGame()">Res
+    <button onclick="restartGame()">Restart</button>
+</div>
+
+<!-- Audio -->
+<audio id="clickSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_3f9b0d94b6.mp3?filename=pop-39222.mp3"></audio>
+<audio id="missSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_d65bc74c71.mp3?filename=negative_beeps-6008.mp3"></audio>
+<audio id="bgMusic" src="https://cdn.pixabay.com/download/audio/2023/03/07/audio_3a1b49a3a5.mp3?filename=arcade-arcade-music-loop-146875.mp3" loop></audio>
+
+<script>
+let score = 0, lives = 3, fallSpeed = 4000, spawnRate = 1000;
+let gameActive = false, gameInterval, timerInterval, timer;
+const clickSound = document.getElementById("clickSound");
+const missSound = document.getElementById("missSound");
+const bgMusic = document.getElementById("bgMusic");
+
+document.getElementById("startScreen").style.display = "block";
+
+function unlockAudio() {
+    try {
+        clickSound.play().then(() => { clickSound.pause(); clickSound.currentTime = 0; });
+        missSound.play().then(() => { missSound.pause(); missSound.currentTime = 0; });
+        bgMusic.play().then(() => { bgMusic.pause(); bgMusic.currentTime = 0; });
+    } catch (err) { console.warn("Audio unlock failed:", err); }
+}
+
+function startGame() {
+    unlockAudio();
+
+    if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+
+    bgMusic.currentTime = 0;
+    bgMusic.play().catch(err => console.log("Music autoplay blocked:", err));
+
+    score = 0; lives = 3; fallSpeed = 4000; spawnRate = 1000;
+    document.getElementById("score").textContent = "Score: 0";
+    document.getElementById("lives").textContent = "Lives: 3 ❤️";
+    document.getElementById("startScreen").style.display = "none";
+    document.getElementById("gameOver").style.display = "none";
+    gameActive = true;
+    gameInterval = setInterval(spawnEmoji, spawnRate);
+}
+
+function spawnEmoji() {
+    if (!gameActive) return;
+
+    const emojiList = ["🍕","🍔","🍟","🍩","🍎","🍌","🍓","🪙","💎","⭐","⚽"];
+    const emoji = document.createElement("div");
+    emoji.classList.add("emoji");
+    emoji.textContent = emojiList[Math.floor(Math.random() * emojiList.length)];
+    emoji.style.left = Math.random() * (window.innerWidth - 50) + "px";
+    emoji.style.animationDuration = fallSpeed / 1000 + "s";
+
+    document.body.appendChild(emoji);
+
+    let clicked = false;
+    emoji.addEventListener("click", () => {
+        if (clicked) return;
+        clicked = true;
+        score++;
+        clickSound.currentTime = 0; clickSound.play();
+        document.getElementById("score").textContent = "Score: " + score;
+        emoji.classList.add("pop");
+        setTimeout(() => emoji.remove(), 300);
+
+        if (score % 100 === 0) spawnEnemy();
+        if (spawnRate > 300) spawnRate -= 20;
+        if (fallSpeed > 1000) fallSpeed -= 50;
+        clearInterval(gameInterval);
+        gameInterval = setInterval(spawnEmoji, spawnRate);
+    });
+
+    setTimeout(() => {
+        if (!clicked && gameActive) {
+            lives--;
+            missSound.currentTime = 0; missSound.play();
+            document.getElementById("lives").textContent = "Lives: " + lives + " ❤️";
+            if (lives <= 0) gameOver();
+        }
+        emoji.remove();
+    }, fallSpeed);
+}
+
+function spawnEnemy() {
+    const enemy = document.createElement("div");
+    enemy.classList.add("enemy");
+    enemy.textContent = "👾";
+    enemy.style.top = Math.random() * (window.innerHeight - 100) + "px";
+    document.body.appendChild(enemy);
+    setTimeout(() => enemy.remove(), 10000);
+}
+
+function gameOver() {
+    gameActive = false;
+    clearInterval(gameInterval);
+    bgMusic.pause();
+    document.getElementById("finalScore").textContent = "Your Score: " + score;
+    document.getElementById("gameOver").style.display = "block";
+}
+
+function restartGame() {
+    startGame();
+}
+
+// Aurora Background Animation
+const canvas = document.getElementById("bgCanvas");
+const ctx = canvas.getContext("2d");
+let w, h;
+function resizeCanvas() { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; }
+window.addEventListener("resize", resizeCanvas); resizeCanvas();
+let gradientShift = 0;
+function drawAurora() {
+    gradientShift += 0.002;
+    let gradient = ctx.createLinearGradient(0, 0, w, h);
+    gradient.addColorStop(0, `hsl(${(gradientShift*200)%360}, 80%, 50%)`);
+    gradient.addColorStop(0.5, `hsl(${(gradientShift*200+60)%360}, 80%, 50%)`);
+    gradient.addColorStop(1, `hsl(${(gradientShift*200+120)%360}, 80%, 50%)`);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, w, h);
+    requestAnimationFrame(drawAurora);
+}
+drawAurora();
+</script>
+</body>
+</html>
