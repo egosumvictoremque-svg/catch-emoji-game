@@ -3,92 +3,56 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Catch the Emoji - Smooth Arcade Edition</title>
+<title>Catch the Emoji - Arcade Edition</title>
 <style>
-html, body {
-    margin: 0;
-    padding: 0;
-    height: 100%;
-    overflow: hidden;
-    background: black;
-    color: white;
-    font-family: Arial, sans-serif;
-}
-#score, #lives, #timer {
-    font-size: 22px;
-    font-weight: bold;
-    position: absolute;
-    top: 10px;
-    z-index: 3;
-}
-#score { left: 10px; }
-#lives { right: 10px; }
-#timer { left: 50%; transform: translateX(-50%); }
-.emoji {
-    position: absolute;
-    font-size: 40px;
-    cursor: pointer;
-    z-index: 3;
-    user-select: none;
-}
-.pop {
-    transform: scale(1.5);
-    opacity: 0;
-    transition: transform 0.2s ease, opacity 0.2s ease;
-}
-#startScreen, #gameOver {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(0,0,0,0.85);
-    padding: 20px;
-    border-radius: 10px;
-    text-align: center;
-    display: none;
-    z-index: 5;
-}
-button {
-    padding: 10px 20px;
-    font-size: 18px;
-    border: none;
-    border-radius: 8px;
-    background: #ff9800;
-    color: white;
-    cursor: pointer;
-}
-button:hover {
-    background: #e68900;
-}
-canvas {
-    position: absolute;
-    top: 0;
-    left: 0;
-    z-index: 0;
-}
-.enemy {
-    position: absolute;
-    font-size: 60px;
-    animation: moveEnemy 10s linear forwards;
-    z-index: 4;
-}
-@keyframes moveEnemy {
-    0% { left: -100px; }
-    100% { left: 110vw; }
-}
+    html, body {
+        margin: 0; padding: 0; height: 100%; overflow: hidden;
+        font-family: Arial, sans-serif; background: black; color: white;
+    }
+    #score, #lives {
+        font-size: 22px; font-weight: bold; position: absolute; top: 10px; z-index: 2;
+    }
+    #score { left: 10px; }
+    #lives { right: 10px; }
+    .emoji {
+        position: absolute; font-size: 40px; cursor: pointer;
+        animation: fall linear forwards;
+    }
+    @keyframes fall {
+        0% { top: -50px; }
+        100% { top: 100vh; }
+    }
+    .pop {
+        animation: pop 0.3s ease-out forwards;
+    }
+    @keyframes pop {
+        0% { transform: scale(1); opacity: 1; }
+        100% { transform: scale(2); opacity: 0; }
+    }
+    #gameOver, #startScreen {
+        position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        background: rgba(0,0,0,0.8); padding: 20px; font-size: 22px;
+        border-radius: 10px; display: none; z-index: 3; text-align: center;
+    }
+    button {
+        padding: 10px 20px; font-size: 18px; border: none; border-radius: 8px;
+        background: #ff9800; color: white; cursor: pointer;
+    }
+    button:hover { background: #e68900; }
+    canvas { position: absolute; top: 0; left: 0; z-index: 0; }
 </style>
 </head>
 <body>
 
+<!-- Background -->
 <canvas id="bgCanvas"></canvas>
 
 <p id="score">Score: 0</p>
 <p id="lives">Lives: 3 ❤️</p>
-<p id="timer"></p>
 
 <div id="startScreen">
-    <h2>🌌 Catch the Emoji - Arcade Edition 🌌</h2>
-    <p>Tap the emojis before they fall!<br>Don't miss or you'll lose lives!</p>
+    <h2>🎮 Catch the Emoji - Arcade Edition 🎮</h2>
+    <p>Tap emojis before they fall!<br>3 Lives Only!</p>
     <button onclick="startGame()">Start Game</button>
 </div>
 
@@ -98,137 +62,115 @@ canvas {
     <button onclick="restartGame()">Restart</button>
 </div>
 
-<!-- Audio -->
-<audio id="clickSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_3f9b0d94b6.mp3?filename=pop-39222.mp3"></audio>
-<audio id="missSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_d65bc74c71.mp3?filename=negative_beeps-6008.mp3"></audio>
-<audio id="bgMusic" src="https://cdn.pixabay.com/download/audio/2023/03/07/audio_3a1b49a3a5.mp3?filename=arcade-arcade-music-loop-146875.mp3" loop></audio>
-
 <script>
-let score = 0, lives = 3;
-let fallSpeed = 2.5, spawnDelay = 1000; // lebih smooth
-let gameActive = false, lastSpawn = 0;
-const emojiList = ["🍕","🍔","🍟","🍩","🍎","🍌","🍓","🪙","💎","⭐","⚽","🎯"];
-const clickSound = document.getElementById("clickSound");
-const missSound = document.getElementById("missSound");
-const bgMusic = document.getElementById("bgMusic");
+    let score = 0, lives = 3, gameActive = false;
+    let gameInterval, fallSpeed = 4000, spawnRate = 800, difficultyTimer;
+    const emojiList = ["🍕","🍔","🍟","🍩","🍎","🍌","🍓","🪙","💎","⭐","⚽"];
 
-document.getElementById("startScreen").style.display = "block";
-
-function unlockAudio() {
-    try {
-        clickSound.play().then(() => { clickSound.pause(); clickSound.currentTime = 0; });
-        missSound.play().then(() => { missSound.pause(); missSound.currentTime = 0; });
-        bgMusic.play().then(() => { bgMusic.pause(); bgMusic.currentTime = 0; });
-    } catch {}
-}
-
-function startGame() {
-    unlockAudio();
-    if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
-
-    bgMusic.currentTime = 0;
-    bgMusic.play().catch(() => {});
-
-    score = 0; lives = 3;
-    fallSpeed = 2.5; spawnDelay = 1000;
-    document.getElementById("score").textContent = "Score: 0";
-    document.getElementById("lives").textContent = "Lives: 3 ❤️";
-    document.getElementById("startScreen").style.display = "none";
-    document.getElementById("gameOver").style.display = "none";
-    gameActive = true;
-    lastSpawn = performance.now();
-    requestAnimationFrame(gameLoop);
-}
-
-function spawnEmoji() {
-    const emoji = document.createElement("div");
-    emoji.classList.add("emoji");
-    emoji.textContent = emojiList[Math.floor(Math.random() * emojiList.length)];
-    emoji.x = Math.random() * (window.innerWidth - 50);
-    emoji.y = -50;
-    emoji.style.left = emoji.x + "px";
-    emoji.style.top = emoji.y + "px";
-    document.body.appendChild(emoji);
-
-    emoji.addEventListener("click", () => {
-        if (!gameActive || emoji.clicked) return;
-        emoji.clicked = true;
-        score++;
-        clickSound.currentTime = 0; clickSound.play();
-        document.getElementById("score").textContent = "Score: " + score;
-        emoji.classList.add("pop");
-        setTimeout(() => emoji.remove(), 200);
-
-        if (score % 100 === 0) spawnEnemy();
-        if (spawnDelay > 300) spawnDelay -= 20;
-        if (fallSpeed < 7) fallSpeed += 0.1;
-    });
-}
-
-function spawnEnemy() {
-    const enemy = document.createElement("div");
-    enemy.classList.add("enemy");
-    enemy.textContent = "👾";
-    enemy.style.top = Math.random() * (window.innerHeight - 100) + "px";
-    document.body.appendChild(enemy);
-    setTimeout(() => enemy.remove(), 10000);
-}
-
-function gameLoop(timestamp) {
-    if (!gameActive) return;
-
-    // Spawn emoji sesuai delay
-    if (timestamp - lastSpawn > spawnDelay) {
-        spawnEmoji();
-        lastSpawn = timestamp;
+    // Web Audio API
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playBeep(type="pop") {
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        if (type === "pop") {
+            osc.frequency.value = 800;
+            gainNode.gain.value = 0.2;
+        } else {
+            osc.frequency.value = 150;
+            gainNode.gain.value = 0.3;
+        }
+        osc.type = "square";
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.15);
     }
 
-    // Gerakkan semua emoji
-    document.querySelectorAll(".emoji").forEach(emoji => {
-        if (emoji.clicked) return;
-        emoji.y += fallSpeed;
-        emoji.style.top = emoji.y + "px";
-        if (emoji.y > window.innerHeight) {
+    document.getElementById("startScreen").style.display = "block";
+
+    function startGame() {
+        document.documentElement.requestFullscreen?.();
+        audioCtx.resume(); // Aktifkan audio
+
+        score = 0; lives = 3; gameActive = true;
+        fallSpeed = 4000; spawnRate = 800;
+        document.getElementById("score").textContent = "Score: " + score;
+        document.getElementById("lives").textContent = "Lives: " + lives + " ❤️";
+        document.getElementById("startScreen").style.display = "none";
+        document.getElementById("gameOver").style.display = "none";
+
+        gameInterval = setInterval(spawnEmoji, spawnRate);
+        difficultyTimer = setInterval(increaseDifficulty, 10000); // tiap 10 detik makin cepat
+    }
+
+    function spawnEmoji() {
+        if (!gameActive) return;
+        const emoji = document.createElement("div");
+        emoji.classList.add("emoji");
+        emoji.textContent = emojiList[Math.floor(Math.random()*emojiList.length)];
+        emoji.style.left = Math.random()*(window.innerWidth-50) + "px";
+        emoji.style.animationDuration = (fallSpeed/1000) + "s";
+        document.body.appendChild(emoji);
+
+        let clicked = false;
+        emoji.addEventListener("click", () => {
+            if (!clicked) {
+                clicked = true;
+                score++;
+                playBeep("pop");
+                document.getElementById("score").textContent = "Score: " + score;
+                emoji.classList.add("pop");
+                setTimeout(()=>emoji.remove(), 300);
+            }
+        }, { once: true });
+
+        setTimeout(() => {
+            if (!clicked && gameActive) {
+                lives--;
+                playBeep("miss");
+                document.getElementById("lives").textContent = "Lives: " + lives + " ❤️";
+                if (lives <= 0) gameOver();
+            }
             emoji.remove();
-            lives--;
-            missSound.currentTime = 0; missSound.play();
-            document.getElementById("lives").textContent = "Lives: " + lives + " ❤️";
-            if (lives <= 0) gameOver();
+        }, fallSpeed);
+    }
+
+    function increaseDifficulty() {
+        if (fallSpeed > 1500) fallSpeed -= 300;
+        if (spawnRate > 300) {
+            clearInterval(gameInterval);
+            spawnRate -= 100;
+            gameInterval = setInterval(spawnEmoji, spawnRate);
         }
-    });
+    }
 
-    requestAnimationFrame(gameLoop);
-}
+    function gameOver() {
+        gameActive = false;
+        clearInterval(gameInterval);
+        clearInterval(difficultyTimer);
+        document.getElementById("finalScore").textContent = "Your Score: " + score;
+        document.getElementById("gameOver").style.display = "block";
+    }
 
-function gameOver() {
-    gameActive = false;
-    bgMusic.pause();
-    document.getElementById("finalScore").textContent = "Your Score: " + score;
-    document.getElementById("gameOver").style.display = "block";
-}
+    function restartGame() { startGame(); }
 
-function restartGame() {
-    startGame();
-}
-
-// Aurora Background Animation
-const canvas = document.getElementById("bgCanvas");
-const ctx = canvas.getContext("2d");
-let w, h;
-function resizeCanvas() { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; }
-window.addEventListener("resize", resizeCanvas); resizeCanvas();
-let gradientShift = 0;
-function drawAurora() {
-    gradientShift += 0.002;
-    let gradient = ctx.createLinearGradient(0, 0, w, h);
-    gradient.addColorStop(0, `hsl(${(gradientShift*200)%360}, 80%, 50%)`);
-    gradient.addColorStop(0.5, `hsl(${(gradientShift*200+60)%360}, 80%, 50%)`);
-    gradient.addColorStop(1, `hsl(${(gradientShift*200+120)%360}, 80%, 50%)`);
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, w, h);
-    requestAnimationFrame(drawAurora);
-}
-drawAurora();
+    // Aurora background
+    const canvas = document.getElementById("bgCanvas"), ctx = canvas.getContext("2d");
+    let w,h,gradientShift=0;
+    function resizeCanvas() { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; }
+    window.addEventListener("resize", resizeCanvas); resizeCanvas();
+    function drawAurora() {
+        gradientShift += 0.002;
+        let gradient = ctx.createLinearGradient(0, 0, w, h);
+        gradient.addColorStop(0, `hsl(${(gradientShift*200)%360}, 80%, 50%)`);
+        gradient.addColorStop(0.5, `hsl(${(gradientShift*200+60)%360}, 80%, 50%)`);
+        gradient.addColorStop(1, `hsl(${(gradientShift*200+120)%360}, 80%, 50%)`);
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, w, h);
+        requestAnimationFrame(drawAurora);
+    }
+    drawAurora();
 </script>
+
 </body>
 </html>
