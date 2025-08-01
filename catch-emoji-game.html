@@ -1,10 +1,8 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
+<html lang="en"> <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Catch the Emoji - Galactic Arcade</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
+<title>Catch the Emoji - Galactic Arcade</title> <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
@@ -196,7 +194,7 @@ canvas {
     position: absolute;
     top: 0;
     left: 0;
-    z-index: 0;
+    z-index: 0; /* Pastikan di paling belakang */
 }
 
 /* --- Enemy Styles & Animation --- */
@@ -398,7 +396,7 @@ const translations = {
     }
 };
 
-let currentLanguage = "en"; // Default language
+let currentLanguage = "en"; // Default language diubah ke EN
 
 // --- DOM ELEMENTS ---
 const loadingScreen = document.getElementById("loadingScreen");
@@ -447,6 +445,8 @@ async function unlockAudio() {
     const audioElements = [clickSound, missSound, badClickSound, powerUpSound, levelUpSound, gameOverSound, bgMusic];
     try {
         await Promise.all(audioElements.map(audio => {
+            // Play and pause quickly to unlock audio context in browsers
+            // This is a common workaround for browser autoplay policies
             return audio.play().then(() => { audio.pause(); audio.currentTime = 0; }).catch(e => console.warn(`Failed to unlock ${audio.id}:`, e));
         }));
         console.log("Audio unlock successful!");
@@ -457,10 +457,19 @@ async function unlockAudio() {
 
 function playSound(audioElement) {
     if (audioElement && audioElement.readyState >= 2) { // Check if audio is ready
-        audioElement.currentTime = 0;
+        audioElement.currentTime = 0; // Reset audio to start for quick repeated plays
         audioElement.play().catch(err => console.warn(`Failed to play sound: ${audioElement.id}`, err));
     } else {
         console.warn(`Audio not ready: ${audioElement.id}.`);
+    }
+}
+
+// Fungsi untuk efek vibrasi
+function vibrate(duration) {
+    if ("vibrate" in navigator) {
+        navigator.vibrate(duration);
+    } else {
+        console.log("Vibrate API not supported on this device/browser.");
     }
 }
 
@@ -470,6 +479,7 @@ function loadTranslations() {
     startScreenInstructions.innerHTML = translations[currentLanguage].instructions;
     startButton.textContent = translations[currentLanguage].startGame;
     gameOverTitle.textContent = translations[currentLanguage].gameOver;
+    finalScoreDisplay.textContent = `${translations[currentLanguage].yourScore}${score}`; // Update final score for localization
     restartButton.textContent = translations[currentLanguage].restart;
     document.querySelector('#startScreen .language-select label').textContent = translations[currentLanguage].language;
 
@@ -506,8 +516,10 @@ function showMessage(text, duration = 1000) {
 // --- GAME FUNCTIONS ---
 function startGame() {
     console.log("Starting game...");
-    playSound(bgMusic);
+    // Pastikan musik latar diputar setelah interaksi pengguna
+    bgMusic.play().catch(err => console.warn("Failed to play background music:", err));
 
+    // Request fullscreen on game start for immersive experience (might require user gesture on some browsers)
     if (document.documentElement.requestFullscreen) {
         document.documentElement.requestFullscreen().catch(err => console.error("Fullscreen error:", err));
     }
@@ -521,6 +533,7 @@ function startGame() {
 
     applyLevelSettings(level);
 
+    // Hapus semua emoji, musuh, partikel, dan feedback skor yang ada
     currentEmojis.forEach(emoji => { if(emoji.element && emoji.element.parentNode) emoji.element.remove(); });
     currentEmojis = [];
     document.querySelectorAll(".enemy").forEach(enemy => enemy.remove());
@@ -606,6 +619,7 @@ function spawnEmoji() {
     let type = EMOJI_TYPE.GOOD;
     const randomChance = Math.random();
     
+    // Pastikan currentLevelEmojis tidak null atau undefined
     const currentBadEmojiChance = currentLevelEmojis ? currentLevelEmojis.badEmojiChance : levelEmojis[0].badEmojiChance;
 
     if (randomChance < 0.08) { // 8% chance for power-up
@@ -616,6 +630,7 @@ function spawnEmoji() {
         emojiDiv.classList.add("negative-emoji");
     }
     
+    // Pastikan selectedEmojiList tidak null atau undefined
     const selectedEmojiList = currentLevelEmojis && currentLevelEmojis[type] ? currentLevelEmojis[type] : levelEmojis[0][type];
     emojiDiv.textContent = selectedEmojiList[Math.floor(Math.random() * selectedEmojiList.length)];
     
@@ -646,6 +661,7 @@ function spawnEmoji() {
         if (emojiObject.type === EMOJI_TYPE.GOOD && now - lastClickTime < COMBO_THRESHOLD_MS) {
             comboCount++;
             pointsEarned = 1 + COMBO_BONUS_SCORE; // Base 1 + combo bonus
+            // Menggunakan template string untuk combo message
             createScoreFeedback(event.clientX, event.clientY, `+${pointsEarned} ${translations[currentLanguage].combo.replace('{count}', comboCount)}`);
             playSound(clickSound); // Combo sound, could be different later
         } else {
@@ -661,6 +677,7 @@ function spawnEmoji() {
                     isLifeLost = true;
                     createScoreFeedback(event.clientX, event.clientY, `-1 ❤️`, 'negative');
                     playSound(badClickSound);
+                    vibrate(200); // Vibrasi saat klik emoji buruk
                     break;
                 case EMOJI_TYPE.POWER_UP:
                     pointsEarned = 5;
@@ -682,7 +699,8 @@ function spawnEmoji() {
             currentEmojis = currentEmojis.filter(e => e.element !== emojiDiv);
         };
         emojiDiv.addEventListener('transitionend', removeEmoji, {once: true});
-        setTimeout(removeEmoji, 300); // Fallback removal
+        // Fallback removal if transitionend doesn't fire (e.g., if element is removed too quickly)
+        setTimeout(removeEmoji, 300); 
 
         if (score % ENEMY_SPAWN_INTERVAL === 0 && score !== 0) {
             spawnEnemy();
@@ -710,9 +728,11 @@ function spawnEnemy() {
     enemy.addEventListener('click', () => {
         if (enemy.parentNode) enemy.remove();
         playSound(badClickSound); // Or a specific "enemy hit" sound
+        vibrate(200); // Vibrasi saat klik musuh
         createScoreFeedback(enemy.offsetLeft + enemy.offsetWidth / 2, enemy.offsetTop + enemy.offsetHeight / 2, `OUCH!`, 'negative');
     });
 
+    // Remove enemy after its lifespan
     setTimeout(() => {
         if(enemy.parentNode) enemy.remove();
     }, ENEMY_LIFESPAN / difficultyMultiplier);
@@ -749,30 +769,33 @@ function gameLoop(timestamp) {
         lastSpawn = timestamp;
     }
 
+    // Filter out emojis that have been clicked or fallen off-screen
     currentEmojis = currentEmojis.filter(emojiObject => {
         const emojiDiv = emojiObject.element;
         if (!emojiDiv || emojiObject.clicked) {
-            return false;
+            return false; // Remove if clicked or element no longer exists
         }
 
         emojiObject.y += fallSpeed;
         emojiDiv.style.top = `${emojiObject.y}px`;
 
         if (emojiObject.y > window.innerHeight) {
-            if(emojiDiv.parentNode) emojiDiv.remove();
+            if(emojiDiv.parentNode) emojiDiv.remove(); // Remove from DOM
             if (emojiObject.type === EMOJI_TYPE.GOOD || emojiObject.type === EMOJI_TYPE.POWER_UP) {
                 lives--;
                 playSound(missSound);
-                createScoreFeedback(emojiObject.x, window.innerHeight - 30, `-1 ❤️`, 'negative'); // Feedback for miss
+                vibrate(100); // Vibrasi saat emoji bagus/power-up lolos
+                // Feedback for missed good/power-up emoji
+                createScoreFeedback(emojiObject.x, window.innerHeight - 30, `-1 ❤️`, 'negative'); 
                 updateUI();
                 if (lives <= 0) {
                     gameOver();
-                    return false;
+                    return false; // Stop processing this emoji
                 }
             }
-            return false;
+            return false; // Remove emoji from currentEmojis array
         }
-        return true;
+        return true; // Keep emoji in currentEmojis array
     });
 
     gameInterval = requestAnimationFrame(gameLoop);
@@ -792,16 +815,18 @@ function gameOver() {
     finalScoreDisplay.textContent = `${translations[currentLanguage].yourScore}${score}`;
     gameOverScreen.style.display = "block";
 
+    // Clear all game elements from screen immediately for a sudden "game over" feel
     document.querySelectorAll(".emoji, .enemy, .particle, .score-feedback").forEach(el => {
         if(el.parentNode) el.remove();
     });
-    currentEmojis = [];
+    currentEmojis = []; // Clear array
 }
 
 function restartGame() {
     console.log("Restarting game...");
     gameOverScreen.style.display = "none"; // Hide game over screen
     startScreen.style.display = "block"; // Show start screen for fresh start and options
+    // Game will truly restart when user clicks startButton again
 }
 
 // --- AURORA BACKGROUND ANIMATION ---
@@ -815,7 +840,7 @@ const STAR_SPEED = 0.5;
 const STAR_VARIATION_SPEED = 0.4;
 
 function initStars() {
-    particles = [];
+    particles = []; // Clear existing particles
     for (let i = 0; i < NUM_STARS; i++) {
         particles.push({
             x: Math.random() * w,
@@ -834,9 +859,9 @@ function resizeCanvas() {
     resizeTimeout = setTimeout(() => {
         w = canvas.width = window.innerWidth;
         h = canvas.height = window.innerHeight;
-        initStars();
+        initStars(); // Re-initialize stars when canvas resizes
         console.log(`Canvas resized to ${w}x${h}`);
-    }, 250);
+    }, 250); // Debounce to prevent excessive resizing
 }
 window.addEventListener("resize", resizeCanvas);
 
@@ -847,6 +872,7 @@ const STAR_TWINKLE_SPEED = 0.05;
 const STAR_TWINKLE_AMPLITUDE = 0.3;
 
 function drawAurora() {
+    // If canvas dimensions are not set, try to resize and then redraw
     if (w === 0 || h === 0) {
         resizeCanvas();
         requestAnimationFrame(drawAurora);
@@ -856,6 +882,7 @@ function drawAurora() {
     gradientShift += 0.001;
     auroraWave += AURORA_WAVE_SPEED;
 
+    // Create a dynamic gradient for aurora effect
     let gradient = ctx.createLinearGradient(0, 0, w, h);
     gradient.addColorStop(0, `hsl(${(gradientShift*100)%360}, 90%, 50%)`);
     gradient.addColorStop(0.3, `hsl(${(gradientShift*100+40)%360}, 90%, 50%)`);
@@ -864,51 +891,55 @@ function drawAurora() {
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, w, h);
 
+    // Draw and update stars
     ctx.fillStyle = 'white';
     particles.forEach(p => {
         p.y += p.speed;
-        if (p.y > h) {
+        if (p.y > h) { // If star goes off screen, reset its position to top
             p.y = 0 - p.radius;
             p.x = Math.random() * w;
             p.speed = Math.random() * STAR_VARIATION_SPEED + STAR_SPEED;
             p.originalAlpha = Math.random() * 0.5 + 0.5;
         }
         
+        // Apply twinkling effect
         p.alpha = p.originalAlpha + Math.sin(p.y * STAR_TWINKLE_SPEED + auroraWave) * STAR_TWINKLE_AMPLITUDE;
-        ctx.globalAlpha = Math.max(0, Math.min(1, p.alpha));
+        ctx.globalAlpha = Math.max(0, Math.min(1, p.alpha)); // Clamp alpha between 0 and 1
         
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
         ctx.fill();
     });
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = 1; // Reset globalAlpha
 
-    requestAnimationFrame(drawAurora);
+    requestAnimationFrame(drawAurora); // Continue animation loop
 }
 
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', async () => {
     // Set initial loading text
     loadingScreen.style.display = 'flex';
-    document.querySelector('#loadingScreen p').textContent = translations[currentLanguage].loading;
+    // Gunakan terjemahan untuk teks loading
+    document.querySelector('#loadingScreen p').textContent = translations[currentLanguage].loading; 
 
     // Initialize canvas size and stars immediately
-    resizeCanvas();
-    drawAurora(); // Start background animation
+    resizeCanvas(); // Set initial canvas dimensions
+    drawAurora(); // Start background animation loop
 
-    // Try to unlock audio (might need user interaction)
-    await unlockAudio();
+    // Try to unlock audio (might require user gesture on some browsers)
+    await unlockAudio(); 
 
-    // Hide loading screen and show start screen
+    // Hide loading screen and show start screen after all is loaded/prepared
     loadingScreen.style.display = 'none';
     startScreen.style.display = 'block';
 
-    // Load initial translations
+    // Load initial translations based on currentLanguage (now 'en')
     loadTranslations();
 
     // Attach event listeners
     startButton.addEventListener('click', startGame);
-    restartButton.addEventListener('click', startGame); // Changed to startGame for full reset
+    // Restart button now explicitly goes back to the start screen
+    restartButton.addEventListener('click', restartGame); 
 });
 </script>
 </body>
