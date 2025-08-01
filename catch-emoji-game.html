@@ -3,174 +3,913 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Catch the Emoji - Arcade Edition</title>
+<title>Catch the Emoji - Galactic Arcade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
-    html, body {
-        margin: 0; padding: 0; height: 100%; overflow: hidden;
-        font-family: Arial, sans-serif; background: black; color: white;
-    }
-    #score, #lives {
-        font-size: 22px; font-weight: bold; position: absolute; top: 10px; z-index: 2;
-    }
-    #score { left: 10px; }
-    #lives { right: 10px; }
-    .emoji {
-        position: absolute; font-size: 40px; cursor: pointer;
-        animation: fall linear forwards;
-    }
-    @keyframes fall {
-        0% { top: -50px; }
-        100% { top: 100vh; }
-    }
-    .pop {
-        animation: pop 0.3s ease-out forwards;
-    }
-    @keyframes pop {
-        0% { transform: scale(1); opacity: 1; }
-        100% { transform: scale(2); opacity: 0; }
-    }
-    #gameOver, #startScreen {
-        position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-        background: rgba(0,0,0,0.8); padding: 20px; font-size: 22px;
-        border-radius: 10px; display: none; z-index: 3; text-align: center;
-    }
-    button {
-        padding: 10px 20px; font-size: 18px; border: none; border-radius: 8px;
-        background: #ff9800; color: white; cursor: pointer;
-    }
-    button:hover { background: #e68900; }
-    canvas { position: absolute; top: 0; left: 0; z-index: 0; }
+/* --- Global Styles --- */
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+    background: black; /* Default background, will be overridden by canvas */
+    color: white;
+    font-family: 'Press Start 2P', cursive; /* Arcade font style */
+    user-select: none;
+    cursor: default;
+    display: flex; /* Use flexbox for centering loading screen */
+    justify-content: center;
+    align-items: center;
+}
+
+/* --- Loading Screen --- */
+#loadingScreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.98);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+    font-size: 2em;
+    text-shadow: 0 0 15px #00ffff;
+}
+.spinner {
+    border: 8px solid #f3f3f3; /* Light grey */
+    border-top: 8px solid #00ffff; /* Cyan */
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    animation: spin 2s linear infinite;
+    margin-bottom: 20px;
+}
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* --- UI Elements --- */
+#score, #lives, #level {
+    font-size: 22px;
+    font-weight: bold;
+    position: absolute;
+    top: 10px;
+    z-index: 3;
+    text-shadow: 2px 2px 6px rgba(0,0,0,0.7);
+    animation: pulse 1.5s infinite alternate; /* Heartbeat animation */
+}
+#score { left: 10px; }
+#lives { right: 10px; }
+#level {
+    left: 50%;
+    transform: translateX(-50%);
+    color: #00ffff; /* Special color for level */
+}
+#messageArea {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 2.5em;
+    color: yellow;
+    text-shadow: 0 0 10px orange, 0 0 20px red;
+    z-index: 4;
+    opacity: 0;
+    animation: fadeAndScaleUp 1s ease-out forwards;
+    pointer-events: none; /* Allow clicks to pass through */
+}
+@keyframes fadeAndScaleUp {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+    20% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+    80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.2); }
+}
+
+/* Keyframes for pulse animation */
+@keyframes pulse {
+    0% { transform: scale(1); }
+    100% { transform: scale(1.05); }
+}
+
+/* --- Game Objects --- */
+.emoji {
+    position: absolute;
+    font-size: 40px;
+    cursor: pointer;
+    z-index: 3;
+    transition: transform 0.1s ease-out;
+    filter: drop-shadow(0 0 5px rgba(255,255,255,0.5)); /* Slight glow */
+}
+.emoji:hover {
+    transform: scale(1.15); /* Enlarge more on hover */
+}
+.pop {
+    transform: scale(1.8) rotate(360deg); /* Enlarge and spin */
+    opacity: 0;
+    transition: transform 0.25s ease-out, opacity 0.25s ease-out;
+}
+.negative-emoji {
+    filter: hue-rotate(240deg) saturate(150%) brightness(80%) drop-shadow(0 0 8px red); /* More menacing */
+}
+.power-up-emoji {
+    text-shadow: 0 0 15px gold, 0 0 30px orange;
+    animation: floatAndGlow 2s infinite alternate ease-in-out; /* Floating and glowing animation */
+}
+
+@keyframes floatAndGlow {
+    0% { transform: translateY(0); text-shadow: 0 0 15px gold, 0 0 30px orange; }
+    50% { transform: translateY(-5px); text-shadow: 0 0 20px gold, 0 0 40px orange; }
+    100% { transform: translateY(0); text-shadow: 0 0 15px gold, 0 0 30px orange; }
+}
+
+/* --- Screens --- */
+#startScreen, #gameOver {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.95); /* Very dark */
+    padding: 40px;
+    border-radius: 20px;
+    text-align: center;
+    display: none;
+    z-index: 5;
+    box-shadow: 0 0 30px rgba(0,255,255,0.7), 0 0 60px rgba(0,255,255,0.3);
+    border: 3px solid #00ffff; /* Striking border */
+}
+#startScreen h2, #gameOver h2 {
+    color: #00ffff;
+    font-size: 2.5em; /* Larger title size */
+    margin-bottom: 20px;
+}
+#startScreen p, #gameOver p {
+    font-size: 1.1em;
+    line-height: 1.6;
+}
+#startScreen .language-select {
+    margin-top: 15px;
+}
+#startScreen .language-select select {
+    padding: 8px 15px;
+    font-size: 16px;
+    background-color: #333;
+    color: white;
+    border: 1px solid #00ffff;
+    border-radius: 5px;
+    font-family: 'Press Start 2P', cursive;
+    cursor: pointer;
+}
+
+/* --- Buttons --- */
+button {
+    padding: 15px 30px;
+    font-size: 22px;
+    border: 3px solid #ff9800; /* Button border */
+    border-radius: 10px;
+    background: #ff9800;
+    color: white;
+    cursor: pointer;
+    transition: background 0.3s ease, transform 0.1s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+    margin-top: 25px;
+    box-shadow: 0 5px 15px rgba(255,152,0,0.4); /* Button shadow */
+    font-family: 'Press Start 2P', cursive;
+}
+button:hover {
+    background: #e68900;
+    border-color: #e68900;
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(255,152,0,0.6);
+}
+button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 5px rgba(255,152,0,0.4);
+}
+
+/* --- Canvas Background --- */
+canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 0;
+}
+
+/* --- Enemy Styles & Animation --- */
+.enemy {
+    position: absolute;
+    font-size: 60px;
+    animation: moveEnemy 10s linear forwards;
+    z-index: 4;
+    text-shadow: 0 0 20px red, 0 0 40px darkred;
+    filter: drop-shadow(0 0 10px rgba(255,0,0,0.7));
+}
+@keyframes moveEnemy {
+    0% { left: -100px; }
+    100% { left: 110vw; }
+}
+
+/* --- Particle Effects --- */
+.particle {
+    position: absolute;
+    background-color: rgba(255, 255, 0, 0.9);
+    border-radius: 50%;
+    animation: fadeOutUp 0.8s forwards;
+    pointer-events: none;
+    z-index: 6;
+    box-shadow: 0 0 5px yellow;
+}
+@keyframes fadeOutUp {
+    0% { transform: translateY(0) scale(1); opacity: 1; }
+    100% { transform: translateY(-70px) scale(0); opacity: 0; }
+}
+
+/* --- Score/Life Feedback --- */
+.score-feedback {
+    position: absolute;
+    font-size: 1.5em;
+    font-weight: bold;
+    color: limegreen;
+    text-shadow: 0 0 5px black;
+    animation: feedbackPop 0.6s ease-out forwards;
+    pointer-events: none;
+    z-index: 7;
+}
+.score-feedback.negative {
+    color: red;
+}
+@keyframes feedbackPop {
+    0% { transform: translateY(0) scale(0.8); opacity: 1; }
+    100% { transform: translateY(-30px) scale(1.2); opacity: 0; }
+}
+
 </style>
 </head>
 <body>
 
-<!-- Background -->
+<div id="loadingScreen">
+    <div class="spinner"></div>
+    <p>Loading Game Assets...</p>
+</div>
+
 <canvas id="bgCanvas"></canvas>
 
-<p id="score">Score: 0</p>
-<p id="lives">Lives: 3 ❤️</p>
+<p id="score"></p>
+<p id="lives"></p>
+<p id="level"></p>
+<div id="messageArea"></div>
 
 <div id="startScreen">
-    <h2>🎮 Catch the Emoji - Arcade Edition 🎮</h2>
-    <p>Tap emojis before they fall!<br>3 Lives Only!</p>
-    <button onclick="startGame()">Start Game</button>
+    <h2 id="gameTitle"></h2>
+    <p id="startScreenInstructions"></p>
+    <div class="language-select">
+        <label for="langSelect"></label>
+        <select id="langSelect" onchange="setLanguage(this.value)"></select>
+    </div>
+    <button id="startButton"></button>
 </div>
 
 <div id="gameOver">
-    💀 Game Over!<br>
+    <h2 id="gameOverTitle"></h2>
     <p id="finalScore"></p>
-    <button onclick="restartGame()">Restart</button>
+    <button id="restartButton"></button>
 </div>
 
+<audio id="clickSound" src="https://assets.mixkit.co/sfx/preview/mixkit-game-quick-splash-1707.mp3" preload="auto"></audio>
+<audio id="missSound" src="https://assets.mixkit.co/sfx/preview/mixkit-losing-a-life-in-a-video-game-2024.mp3" preload="auto"></audio>
+<audio id="badClickSound" src="https://assets.mixkit.co/sfx/preview/mixkit-sci-fi-bleep-error-1981.mp3" preload="auto"></audio>
+<audio id="powerUpSound" src="https://assets.mixkit.co/sfx/preview/mixkit-unlock-game-skill-and-level-up-2055.mp3" preload="auto"></audio>
+<audio id="levelUpSound" src="https://assets.mixkit.co/sfx/preview/mixkit-game-bling-2070.mp3" preload="auto"></audio>
+<audio id="gameOverSound" src="https://assets.mixkit.co/sfx/preview/mixkit-losing-notification-2041.mp3" preload="auto"></audio>
+<audio id="bgMusic" src="https://www.dl.dropboxusercontent.com/s/z926q0i0t71m1v9/Arcade_Game_Loop.mp3?dl=0" loop preload="auto"></audio>
+
+
 <script>
-    let score = 0, lives = 3, gameActive = false;
-    let gameInterval, fallSpeed = 4000, spawnRate = 800, difficultyTimer;
-    const emojiList = ["🍕","🍔","🍟","🍩","🍎","🍌","🍓","🪙","💎","⭐","⚽"];
+// --- CONSTANTS ---
+const INITIAL_LIVES = 3;
+const SCORE_TO_LEVEL_UP = 50;
+const MAX_LEVEL = 5;
+const ENEMY_SPAWN_INTERVAL = 25; // Enemy appears every 25 score points
+const ENEMY_LIFESPAN = 10000; // ms
+const COMBO_THRESHOLD_MS = 700; // Time window for combo
+const COMBO_BONUS_SCORE = 2; // Bonus score for combo hit
+const MAX_LIVES_CAP = INITIAL_LIVES + 5; // Max lives allowed (initial + 5 bonus)
 
-    // Web Audio API
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    function playBeep(type="pop") {
-        const osc = audioCtx.createOscillator();
-        const gainNode = audioCtx.createGain();
-        osc.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-        if (type === "pop") {
-            osc.frequency.value = 800;
-            gainNode.gain.value = 0.2;
+const EMOJI_TYPE = {
+    GOOD: 'good',
+    BAD: 'bad',
+    POWER_UP: 'power-up'
+};
+
+const enemyEmoji = "👾";
+
+// --- EMOJI LISTS PER LEVEL (INCLUDING "INFINITY" MODE) ---
+const levelEmojis = [
+    // Level 1: Food & Drink
+    {
+        name_en: "Foodie Frenzy", name_id: "Pesta Kuliner",
+        good: ["🍕","🍔","🍟","🍩","🍎","🍌","🍓","🍍"],
+        bad: ["💀","🦠","💩","🚫"],
+        powerUp: ["❤️","💎"],
+        badEmojiChance: 0.25
+    },
+    // Level 2: Nature & Animals
+    {
+        name_en: "Nature's Call", name_id: "Panggilan Alam",
+        good: ["🌳","🌻","🦋","🐠","🐾","🌸","🍄","💧"],
+        bad: ["🕷️","🐍","🐝","🌪️"],
+        powerUp: ["✨","🍀"],
+        badEmojiChance: 0.30
+    },
+    // Level 3: Sports & Activities
+    {
+        name_en: "Sporty Challenge", name_id: "Tantangan Olahraga",
+        good: ["⚽","🏀","🎾","🏈","🎯","🎳","🏆","🏅"],
+        bad: ["💣","💥","🔥","⚡"],
+        powerUp: ["💯","🚀"],
+        badEmojiChance: 0.35
+    },
+    // Level 4: Space & Technology
+    {
+        name_en: "Cosmic Quest", name_id: "Petualangan Kosmik",
+        good: ["🚀","🌌","👽","🪐","🌠","🛰️","🔭","🤖"],
+        bad: ["☄️","⚫","🕳️","☢️"],
+        powerUp: ["⚛️","🌌"],
+        badEmojiChance: 0.40
+    },
+    // Level 5: Fortune & Treasure (Base for Infinity Mode)
+    {
+        name_en: "Chaos Realm", name_id: "Alam Kekacauan",
+        good: ["🪙","💎","⭐","💰","👑","⚜️","✨","🌟"],
+        bad: ["🗿","👹","👺","👿"],
+        powerUp: ["🌈","🔮"],
+        badEmojiChance: 0.45
+    }
+];
+
+// --- LEVEL SETTINGS ---
+const levelSettings = [
+    { fallSpeed: 2.5, spawnDelay: 1000 }, // Level 1
+    { fallSpeed: 3.0, spawnDelay: 900 },  // Level 2
+    { fallSpeed: 3.5, spawnDelay: 800 },  // Level 3
+    { fallSpeed: 4.0, spawnDelay: 700 },  // Level 4
+    { fallSpeed: 4.5, spawnDelay: 600 }   // Level 5 (Base for Infinity Mode)
+];
+
+// --- LOCALIZATION (I18n) ---
+const translations = {
+    "en": {
+        "gameTitle": "🌌 Catch the Emoji - Galactic Arcade 🌌",
+        "instructions": "Tap the good emojis before they fall!<br>Avoid the bad ones! Don't miss or you'll lose lives!",
+        "startGame": "Start Game",
+        "gameOver": "💀 Game Over!",
+        "yourScore": "Your Score: ",
+        "restart": "Restart",
+        "score": "Score: ",
+        "lives": "Lives: ",
+        "level": "Level: ",
+        "infinity": " - INFINITY!",
+        "loading": "Loading Game Assets...",
+        "language": "Language:",
+        "levelUpMessage": "LEVEL UP!",
+        "goodJob": "GOOD JOB!",
+        "combo": "COMBO x{count}!"
+    },
+    "id": {
+        "gameTitle": "🌌 Tangkap Emoji - Arkade Galaksi 🌌",
+        "instructions": "Sentuh emoji yang bagus sebelum jatuh!<br>Hindari emoji yang buruk! Jangan sampai luput atau kamu kehilangan nyawa!",
+        "startGame": "Mulai Permainan",
+        "gameOver": "💀 Game Over!",
+        "yourScore": "Skor Kamu: ",
+        "restart": "Mulai Ulang",
+        "score": "Skor: ",
+        "lives": "Nyawa: ",
+        "level": "Level: ",
+        "infinity": " - TAK TERBATAS!",
+        "loading": "Memuat Aset Game...",
+        "language": "Bahasa:",
+        "levelUpMessage": "NAIK LEVEL!",
+        "goodJob": "KERJA BAGUS!",
+        "combo": "KOMBO x{count}!"
+    }
+};
+
+let currentLanguage = "en"; // Default language
+
+// --- DOM ELEMENTS ---
+const loadingScreen = document.getElementById("loadingScreen");
+const scoreDisplay = document.getElementById("score");
+const livesDisplay = document.getElementById("lives");
+const levelDisplay = document.getElementById("level");
+const messageArea = document.getElementById("messageArea");
+
+const startScreen = document.getElementById("startScreen");
+const gameTitle = document.getElementById("gameTitle");
+const startScreenInstructions = document.getElementById("startScreenInstructions");
+const startButton = document.getElementById("startButton");
+const langSelect = document.getElementById("langSelect");
+
+const gameOverScreen = document.getElementById("gameOver");
+const gameOverTitle = document.getElementById("gameOverTitle");
+const finalScoreDisplay = document.getElementById("finalScore");
+const restartButton = document.getElementById("restartButton");
+
+const clickSound = document.getElementById("clickSound");
+const missSound = document.getElementById("missSound");
+const badClickSound = document.getElementById("badClickSound");
+const powerUpSound = document.getElementById("powerUpSound");
+const levelUpSound = document.getElementById("levelUpSound");
+const gameOverSound = document.getElementById("gameOverSound");
+const bgMusic = document.getElementById("bgMusic");
+
+// --- GAME STATE VARIABLES ---
+let score = 0;
+let lives = 0;
+let level = 1;
+let fallSpeed = 0;
+let spawnDelay = 0;
+let gameActive = false;
+let lastSpawn = 0;
+let currentEmojis = [];
+let currentLevelEmojis;
+let difficultyMultiplier = 1;
+
+let lastClickTime = 0;
+let comboCount = 0;
+let gameInterval = null; // To hold the requestAnimationFrame ID
+
+// --- AUDIO FUNCTIONS ---
+async function unlockAudio() {
+    const audioElements = [clickSound, missSound, badClickSound, powerUpSound, levelUpSound, gameOverSound, bgMusic];
+    try {
+        await Promise.all(audioElements.map(audio => {
+            return audio.play().then(() => { audio.pause(); audio.currentTime = 0; }).catch(e => console.warn(`Failed to unlock ${audio.id}:`, e));
+        }));
+        console.log("Audio unlock successful!");
+    } catch (e) {
+        console.warn("Audio unlock failed (user interaction might still be needed):", e);
+    }
+}
+
+function playSound(audioElement) {
+    if (audioElement && audioElement.readyState >= 2) { // Check if audio is ready
+        audioElement.currentTime = 0;
+        audioElement.play().catch(err => console.warn(`Failed to play sound: ${audioElement.id}`, err));
+    } else {
+        console.warn(`Audio not ready: ${audioElement.id}.`);
+    }
+}
+
+// --- UI / LOCALIZATION FUNCTIONS ---
+function loadTranslations() {
+    gameTitle.textContent = translations[currentLanguage].gameTitle;
+    startScreenInstructions.innerHTML = translations[currentLanguage].instructions;
+    startButton.textContent = translations[currentLanguage].startGame;
+    gameOverTitle.textContent = translations[currentLanguage].gameOver;
+    restartButton.textContent = translations[currentLanguage].restart;
+    document.querySelector('#startScreen .language-select label').textContent = translations[currentLanguage].language;
+
+    // Populate language select options
+    langSelect.innerHTML = '';
+    for (const langCode in translations) {
+        const option = document.createElement('option');
+        option.value = langCode;
+        option.textContent = langCode.toUpperCase(); // Display language code (e.g., EN, ID)
+        if (langCode === currentLanguage) {
+            option.selected = true;
+        }
+        langSelect.appendChild(option);
+    }
+    updateUI(); // Update dynamic UI elements
+}
+
+function setLanguage(lang) {
+    currentLanguage = lang;
+    loadTranslations(); // Re-load all texts
+}
+
+function showMessage(text, duration = 1000) {
+    messageArea.textContent = text;
+    messageArea.style.opacity = 1;
+    messageArea.style.animation = 'fadeAndScaleUp ' + (duration / 1000) + 's ease-out forwards';
+
+    // Reset animation after it finishes to allow re-triggering
+    setTimeout(() => {
+        messageArea.style.animation = 'none';
+    }, duration);
+}
+
+// --- GAME FUNCTIONS ---
+function startGame() {
+    console.log("Starting game...");
+    playSound(bgMusic);
+
+    if (document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen().catch(err => console.error("Fullscreen error:", err));
+    }
+
+    score = 0;
+    lives = INITIAL_LIVES;
+    level = 1;
+    difficultyMultiplier = 1;
+    comboCount = 0;
+    lastClickTime = 0;
+
+    applyLevelSettings(level);
+
+    currentEmojis.forEach(emoji => { if(emoji.element && emoji.element.parentNode) emoji.element.remove(); });
+    currentEmojis = [];
+    document.querySelectorAll(".enemy").forEach(enemy => enemy.remove());
+    document.querySelectorAll(".particle").forEach(p => p.remove());
+    document.querySelectorAll(".score-feedback").forEach(fb => fb.remove()); // Clear feedback
+
+    updateUI();
+
+    startScreen.style.display = "none";
+    gameOverScreen.style.display = "none";
+    gameActive = true;
+    lastSpawn = performance.now();
+    gameInterval = requestAnimationFrame(gameLoop); // Start game loop
+    console.log("Game started.");
+}
+
+function applyLevelSettings(currentLevel) {
+    let effectiveLevelIndex;
+    if (currentLevel > MAX_LEVEL) {
+        effectiveLevelIndex = MAX_LEVEL - 1;
+        difficultyMultiplier += 0.05; // Smooth increase in difficulty
+    } else {
+        effectiveLevelIndex = currentLevel - 1;
+    }
+
+    fallSpeed = levelSettings[effectiveLevelIndex].fallSpeed * difficultyMultiplier;
+    spawnDelay = levelSettings[effectiveLevelIndex].spawnDelay / difficultyMultiplier;
+    currentLevelEmojis = levelEmojis[effectiveLevelIndex];
+    
+    console.log(`Applying settings for Level ${currentLevel}: ${currentLevelEmojis['name_' + currentLanguage] || currentLevelEmojis.name_en}, Fall Speed: ${fallSpeed.toFixed(2)}, Spawn Delay: ${spawnDelay.toFixed(0)}ms`);
+}
+
+function updateUI() {
+    scoreDisplay.textContent = `${translations[currentLanguage].score}${score}`;
+    livesDisplay.textContent = `${translations[currentLanguage].lives}${lives} ❤️`;
+    if (level > MAX_LEVEL) {
+        levelDisplay.textContent = `${translations[currentLanguage].level}${level}${translations[currentLanguage].infinity}`;
+    } else {
+        levelDisplay.textContent = `${translations[currentLanguage].level}${level} - ${currentLevelEmojis ? (currentLevelEmojis['name_' + currentLanguage] || currentLevelEmojis.name_en) : ''}`;
+    }
+}
+
+function checkLevelUp() {
+    if (score >= level * SCORE_TO_LEVEL_UP) {
+        level++;
+        playSound(levelUpSound);
+        showMessage(translations[currentLanguage].levelUpMessage, 1500); // Show "LEVEL UP!" message
+        
+        console.log(`Level Up! You are now on Level ${level}!`);
+        if (level > MAX_LEVEL) {
+            console.log("Entering INFINITY Mode!");
+        }
+        
+        // Clear screen on level up for a fresh start
+        currentEmojis.forEach(emoji => { if(emoji.element && emoji.element.parentNode) emoji.element.remove(); });
+        currentEmojis = [];
+        document.querySelectorAll(".enemy").forEach(enemy => enemy.remove());
+        document.querySelectorAll(".particle").forEach(p => p.remove());
+        document.querySelectorAll(".score-feedback").forEach(fb => fb.remove());
+
+        applyLevelSettings(level);
+        updateUI();
+    }
+}
+
+function createScoreFeedback(x, y, text, type) {
+    const feedbackDiv = document.createElement("div");
+    feedbackDiv.classList.add("score-feedback");
+    feedbackDiv.textContent = text;
+    feedbackDiv.style.left = `${x}px`;
+    feedbackDiv.style.top = `${y}px`;
+    if (type === 'negative') {
+        feedbackDiv.classList.add('negative');
+    }
+    document.body.appendChild(feedbackDiv);
+    feedbackDiv.addEventListener('animationend', () => feedbackDiv.remove(), {once: true});
+}
+
+function spawnEmoji() {
+    const emojiDiv = document.createElement("div");
+    emojiDiv.classList.add("emoji");
+
+    let type = EMOJI_TYPE.GOOD;
+    const randomChance = Math.random();
+    
+    const currentBadEmojiChance = currentLevelEmojis ? currentLevelEmojis.badEmojiChance : levelEmojis[0].badEmojiChance;
+
+    if (randomChance < 0.08) { // 8% chance for power-up
+        type = EMOJI_TYPE.POWER_UP;
+        emojiDiv.classList.add("power-up-emoji");
+    } else if (randomChance < currentBadEmojiChance) { // Use current level's bad emoji chance
+        type = EMOJI_TYPE.BAD;
+        emojiDiv.classList.add("negative-emoji");
+    }
+    
+    const selectedEmojiList = currentLevelEmojis && currentLevelEmojis[type] ? currentLevelEmojis[type] : levelEmojis[0][type];
+    emojiDiv.textContent = selectedEmojiList[Math.floor(Math.random() * selectedEmojiList.length)];
+    
+    emojiDiv.x = Math.random() * (window.innerWidth - 70) + 35;
+    emojiDiv.y = -50;
+
+    emojiDiv.style.left = `${emojiDiv.x}px`;
+    emojiDiv.style.top = `${emojiDiv.y}px`;
+    document.body.appendChild(emojiDiv);
+
+    const emojiObject = {
+        element: emojiDiv,
+        type: type,
+        x: emojiDiv.x,
+        y: emojiDiv.y,
+        clicked: false
+    };
+    currentEmojis.push(emojiObject);
+
+    emojiDiv.addEventListener("click", function(event) {
+        if (!gameActive || emojiObject.clicked) return;
+
+        emojiObject.clicked = true; // Mark as clicked
+        let pointsEarned = 0;
+        let isLifeLost = false;
+
+        const now = performance.now();
+        if (emojiObject.type === EMOJI_TYPE.GOOD && now - lastClickTime < COMBO_THRESHOLD_MS) {
+            comboCount++;
+            pointsEarned = 1 + COMBO_BONUS_SCORE; // Base 1 + combo bonus
+            createScoreFeedback(event.clientX, event.clientY, `+${pointsEarned} ${translations[currentLanguage].combo.replace('{count}', comboCount)}`);
+            playSound(clickSound); // Combo sound, could be different later
         } else {
-            osc.frequency.value = 150;
-            gainNode.gain.value = 0.3;
-        }
-        osc.type = "square";
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.15);
-    }
-
-    document.getElementById("startScreen").style.display = "block";
-
-    function startGame() {
-        document.documentElement.requestFullscreen?.();
-        audioCtx.resume(); // Aktifkan audio
-
-        score = 0; lives = 3; gameActive = true;
-        fallSpeed = 4000; spawnRate = 800;
-        document.getElementById("score").textContent = "Score: " + score;
-        document.getElementById("lives").textContent = "Lives: " + lives + " ❤️";
-        document.getElementById("startScreen").style.display = "none";
-        document.getElementById("gameOver").style.display = "none";
-
-        gameInterval = setInterval(spawnEmoji, spawnRate);
-        difficultyTimer = setInterval(increaseDifficulty, 10000); // tiap 10 detik makin cepat
-    }
-
-    function spawnEmoji() {
-        if (!gameActive) return;
-        const emoji = document.createElement("div");
-        emoji.classList.add("emoji");
-        emoji.textContent = emojiList[Math.floor(Math.random()*emojiList.length)];
-        emoji.style.left = Math.random()*(window.innerWidth-50) + "px";
-        emoji.style.animationDuration = (fallSpeed/1000) + "s";
-        document.body.appendChild(emoji);
-
-        let clicked = false;
-        emoji.addEventListener("click", () => {
-            if (!clicked) {
-                clicked = true;
-                score++;
-                playBeep("pop");
-                document.getElementById("score").textContent = "Score: " + score;
-                emoji.classList.add("pop");
-                setTimeout(()=>emoji.remove(), 300);
+            comboCount = 0; // Reset combo if not a quick good click
+            switch (emojiObject.type) {
+                case EMOJI_TYPE.GOOD:
+                    pointsEarned = 1;
+                    createScoreFeedback(event.clientX, event.clientY, `+${pointsEarned}`);
+                    playSound(clickSound);
+                    break;
+                case EMOJI_TYPE.BAD:
+                    lives--;
+                    isLifeLost = true;
+                    createScoreFeedback(event.clientX, event.clientY, `-1 ❤️`, 'negative');
+                    playSound(badClickSound);
+                    break;
+                case EMOJI_TYPE.POWER_UP:
+                    pointsEarned = 5;
+                    lives = Math.min(lives + 1, MAX_LIVES_CAP); // Cap lives
+                    createScoreFeedback(event.clientX, event.clientY, `+${pointsEarned} +1 ❤️`);
+                    playSound(powerUpSound);
+                    createParticleEffect(emojiDiv.x, emojiDiv.y);
+                    break;
             }
-        }, { once: true });
+        }
+        lastClickTime = now; // Update last click time for combo
 
-        setTimeout(() => {
-            if (!clicked && gameActive) {
+        score += pointsEarned;
+        updateUI();
+
+        emojiDiv.classList.add("pop");
+        const removeEmoji = () => {
+            if (emojiDiv.parentNode) emojiDiv.remove();
+            currentEmojis = currentEmojis.filter(e => e.element !== emojiDiv);
+        };
+        emojiDiv.addEventListener('transitionend', removeEmoji, {once: true});
+        setTimeout(removeEmoji, 300); // Fallback removal
+
+        if (score % ENEMY_SPAWN_INTERVAL === 0 && score !== 0) {
+            spawnEnemy();
+        }
+        
+        if (!isLifeLost) { // Only check level up if not a bad click
+            checkLevelUp();
+        }
+
+        if (lives <= 0) {
+            gameOver();
+        }
+    });
+}
+
+function spawnEnemy() {
+    const enemy = document.createElement("div");
+    enemy.classList.add("enemy");
+    enemy.textContent = enemyEmoji;
+    enemy.style.top = `${Math.random() * (window.innerHeight - 150) + 50}px`;
+    document.body.appendChild(enemy);
+    enemy.style.animationDuration = `${(ENEMY_LIFESPAN / 1000) / difficultyMultiplier}s`;
+    
+    // Add event listener for enemy click (no score, just disappears)
+    enemy.addEventListener('click', () => {
+        if (enemy.parentNode) enemy.remove();
+        playSound(badClickSound); // Or a specific "enemy hit" sound
+        createScoreFeedback(enemy.offsetLeft + enemy.offsetWidth / 2, enemy.offsetTop + enemy.offsetHeight / 2, `OUCH!`, 'negative');
+    });
+
+    setTimeout(() => {
+        if(enemy.parentNode) enemy.remove();
+    }, ENEMY_LIFESPAN / difficultyMultiplier);
+}
+
+function createParticleEffect(x, y) {
+    const numParticles = 15;
+    for (let i = 0; i < numParticles; i++) {
+        const particle = document.createElement('div');
+        particle.classList.add('particle');
+        particle.style.left = `${x + (Math.random() - 0.5) * 30}px`;
+        particle.style.top = `${y + (Math.random() - 0.5) * 30}px`;
+        particle.style.width = particle.style.height = `${Math.random() * 8 + 4}px`;
+        particle.style.opacity = Math.random() * 0.6 + 0.4;
+        particle.style.animationDuration = `${0.6 + Math.random() * 0.4}s`;
+        particle.style.animationDelay = `${Math.random() * 0.1}s`;
+
+        document.body.appendChild(particle);
+        particle.addEventListener('animationend', () => {
+            if(particle.parentNode) particle.remove();
+        }, {once: true});
+    }
+}
+
+function gameLoop(timestamp) {
+    if (!gameActive) {
+        cancelAnimationFrame(gameInterval); // Stop the loop explicitly
+        gameInterval = null;
+        return;
+    }
+
+    if (timestamp - lastSpawn > spawnDelay) {
+        spawnEmoji();
+        lastSpawn = timestamp;
+    }
+
+    currentEmojis = currentEmojis.filter(emojiObject => {
+        const emojiDiv = emojiObject.element;
+        if (!emojiDiv || emojiObject.clicked) {
+            return false;
+        }
+
+        emojiObject.y += fallSpeed;
+        emojiDiv.style.top = `${emojiObject.y}px`;
+
+        if (emojiObject.y > window.innerHeight) {
+            if(emojiDiv.parentNode) emojiDiv.remove();
+            if (emojiObject.type === EMOJI_TYPE.GOOD || emojiObject.type === EMOJI_TYPE.POWER_UP) {
                 lives--;
-                playBeep("miss");
-                document.getElementById("lives").textContent = "Lives: " + lives + " ❤️";
-                if (lives <= 0) gameOver();
+                playSound(missSound);
+                createScoreFeedback(emojiObject.x, window.innerHeight - 30, `-1 ❤️`, 'negative'); // Feedback for miss
+                updateUI();
+                if (lives <= 0) {
+                    gameOver();
+                    return false;
+                }
             }
-            emoji.remove();
-        }, fallSpeed);
-    }
-
-    function increaseDifficulty() {
-        if (fallSpeed > 1500) fallSpeed -= 300;
-        if (spawnRate > 300) {
-            clearInterval(gameInterval);
-            spawnRate -= 100;
-            gameInterval = setInterval(spawnEmoji, spawnRate);
+            return false;
         }
+        return true;
+    });
+
+    gameInterval = requestAnimationFrame(gameLoop);
+}
+
+function gameOver() {
+    console.log("Game Over!");
+    gameActive = false;
+    if (gameInterval) {
+        cancelAnimationFrame(gameInterval);
+        gameInterval = null;
     }
+    bgMusic.pause();
+    bgMusic.currentTime = 0;
+    playSound(gameOverSound);
 
-    function gameOver() {
-        gameActive = false;
-        clearInterval(gameInterval);
-        clearInterval(difficultyTimer);
-        document.getElementById("finalScore").textContent = "Your Score: " + score;
-        document.getElementById("gameOver").style.display = "block";
+    finalScoreDisplay.textContent = `${translations[currentLanguage].yourScore}${score}`;
+    gameOverScreen.style.display = "block";
+
+    document.querySelectorAll(".emoji, .enemy, .particle, .score-feedback").forEach(el => {
+        if(el.parentNode) el.remove();
+    });
+    currentEmojis = [];
+}
+
+function restartGame() {
+    console.log("Restarting game...");
+    gameOverScreen.style.display = "none"; // Hide game over screen
+    startScreen.style.display = "block"; // Show start screen for fresh start and options
+}
+
+// --- AURORA BACKGROUND ANIMATION ---
+const canvas = document.getElementById("bgCanvas");
+const ctx = canvas.getContext("2d");
+let w = 0, h = 0;
+
+let particles = [];
+const NUM_STARS = 150;
+const STAR_SPEED = 0.5;
+const STAR_VARIATION_SPEED = 0.4;
+
+function initStars() {
+    particles = [];
+    for (let i = 0; i < NUM_STARS; i++) {
+        particles.push({
+            x: Math.random() * w,
+            y: Math.random() * h,
+            radius: Math.random() * 1.5 + 0.5,
+            alpha: Math.random() * 0.5 + 0.5,
+            speed: Math.random() * STAR_VARIATION_SPEED + STAR_SPEED,
+            originalAlpha: Math.random() * 0.5 + 0.5
+        });
     }
+}
 
-    function restartGame() { startGame(); }
+let resizeTimeout;
+function resizeCanvas() {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+        w = canvas.width = window.innerWidth;
+        h = canvas.height = window.innerHeight;
+        initStars();
+        console.log(`Canvas resized to ${w}x${h}`);
+    }, 250);
+}
+window.addEventListener("resize", resizeCanvas);
 
-    // Aurora background
-    const canvas = document.getElementById("bgCanvas"), ctx = canvas.getContext("2d");
-    let w,h,gradientShift=0;
-    function resizeCanvas() { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; }
-    window.addEventListener("resize", resizeCanvas); resizeCanvas();
-    function drawAurora() {
-        gradientShift += 0.002;
-        let gradient = ctx.createLinearGradient(0, 0, w, h);
-        gradient.addColorStop(0, `hsl(${(gradientShift*200)%360}, 80%, 50%)`);
-        gradient.addColorStop(0.5, `hsl(${(gradientShift*200+60)%360}, 80%, 50%)`);
-        gradient.addColorStop(1, `hsl(${(gradientShift*200+120)%360}, 80%, 50%)`);
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, w, h);
+let gradientShift = 0;
+let auroraWave = 0;
+const AURORA_WAVE_SPEED = 0.02;
+const STAR_TWINKLE_SPEED = 0.05;
+const STAR_TWINKLE_AMPLITUDE = 0.3;
+
+function drawAurora() {
+    if (w === 0 || h === 0) {
+        resizeCanvas();
         requestAnimationFrame(drawAurora);
+        return;
     }
-    drawAurora();
-</script>
 
+    gradientShift += 0.001;
+    auroraWave += AURORA_WAVE_SPEED;
+
+    let gradient = ctx.createLinearGradient(0, 0, w, h);
+    gradient.addColorStop(0, `hsl(${(gradientShift*100)%360}, 90%, 50%)`);
+    gradient.addColorStop(0.3, `hsl(${(gradientShift*100+40)%360}, 90%, 50%)`);
+    gradient.addColorStop(0.6, `hsl(${(gradientShift*100+80)%360}, 90%, 50%)`);
+    gradient.addColorStop(1, `hsl(${(gradientShift*100+120)%360}, 90%, 50%)`);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.fillStyle = 'white';
+    particles.forEach(p => {
+        p.y += p.speed;
+        if (p.y > h) {
+            p.y = 0 - p.radius;
+            p.x = Math.random() * w;
+            p.speed = Math.random() * STAR_VARIATION_SPEED + STAR_SPEED;
+            p.originalAlpha = Math.random() * 0.5 + 0.5;
+        }
+        
+        p.alpha = p.originalAlpha + Math.sin(p.y * STAR_TWINKLE_SPEED + auroraWave) * STAR_TWINKLE_AMPLITUDE;
+        ctx.globalAlpha = Math.max(0, Math.min(1, p.alpha));
+        
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+
+    requestAnimationFrame(drawAurora);
+}
+
+// --- INITIALIZATION ---
+document.addEventListener('DOMContentLoaded', async () => {
+    // Set initial loading text
+    loadingScreen.style.display = 'flex';
+    document.querySelector('#loadingScreen p').textContent = translations[currentLanguage].loading;
+
+    // Initialize canvas size and stars immediately
+    resizeCanvas();
+    drawAurora(); // Start background animation
+
+    // Try to unlock audio (might need user interaction)
+    await unlockAudio();
+
+    // Hide loading screen and show start screen
+    loadingScreen.style.display = 'none';
+    startScreen.style.display = 'block';
+
+    // Load initial translations
+    loadTranslations();
+
+    // Attach event listeners
+    startButton.addEventListener('click', startGame);
+    restartButton.addEventListener('click', startGame); // Changed to startGame for full reset
+});
+</script>
 </body>
 </html>
